@@ -1,9 +1,10 @@
 // App.js
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import WeatherCard from './components/WeatherCard';
 import Calendar from './components/Calendar';
 import MeteorologicalPredictions from './components/MeteorologicalPredictions';
-import { saveSearch } from './services/SearchHistoryService';
+import RecentSearches from './components/RecentSearches';
+import { getRecentSearches, saveSearch } from './services/SearchHistoryService';
 import { getWeatherData } from './services/WeatherService';
 
 const App = () => {
@@ -13,14 +14,37 @@ const App = () => {
   const [meteorologicalPredictions, setMeteorologicalPredictions] = useState(
     'Search for a city to see the weekly forecast.'
   );
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [isRecentSearchesLoading, setIsRecentSearchesLoading] = useState(false);
+  const [isRecentSearchesUnavailable, setIsRecentSearchesUnavailable] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const loadRecentSearches = useCallback(async ({ showLoading = true } = {}) => {
+    if (showLoading) {
+      setIsRecentSearchesLoading(true);
+    }
+
+    try {
+      const searches = await getRecentSearches();
+      setRecentSearches(searches);
+      setIsRecentSearchesUnavailable(false);
+    } catch (error) {
+      setRecentSearches([]);
+      setIsRecentSearchesUnavailable(true);
+    } finally {
+      if (showLoading) {
+        setIsRecentSearchesLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const currentDate = new Date().toDateString();
 
     setDate(currentDate);
-  }, []);
+    void loadRecentSearches();
+  }, [loadRecentSearches]);
 
   const handleSearch = async (event) => {
     event.preventDefault();
@@ -31,7 +55,11 @@ const App = () => {
       const data = await getWeatherData(city);
       setWeatherData(data);
       setMeteorologicalPredictions(data.forecastSummary);
-      void saveSearch(data.name);
+      void saveSearch(data.name).then((saved) => {
+        if (saved) {
+          void loadRecentSearches({ showLoading: false });
+        }
+      });
     } catch (error) {
       console.error('Error fetching weather data:', error);
       setWeatherData(null);
@@ -61,6 +89,11 @@ const App = () => {
       {meteorologicalPredictions && (
         <MeteorologicalPredictions predictions={meteorologicalPredictions} />
       )}
+      <RecentSearches
+        searches={recentSearches}
+        isLoading={isRecentSearchesLoading}
+        isUnavailable={isRecentSearchesUnavailable}
+      />
     </div>
   );
 };

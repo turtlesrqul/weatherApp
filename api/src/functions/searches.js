@@ -30,63 +30,100 @@ const parseRequestBody = async (request) => {
   }
 };
 
+const getRecentSearches = async (context) => {
+  try {
+    const pool = await getConnectionPool();
+    const result = await pool.request().query(`
+      SELECT TOP (20) id, city_name, searched_at
+      FROM dbo.search_history
+      ORDER BY searched_at DESC;
+    `);
+
+    return {
+      status: 200,
+      jsonBody: {
+        searches: result.recordset,
+      },
+    };
+  } catch (error) {
+    poolPromise = undefined;
+    context.error('Failed to load search history.', error);
+
+    return {
+      status: 500,
+      jsonBody: {
+        searches: [],
+        message: 'Search history is temporarily unavailable.',
+      },
+    };
+  }
+};
+
+const saveSearch = async (request, context) => {
+  const body = await parseRequestBody(request);
+  const cityName = typeof body.cityName === 'string' ? body.cityName.trim() : '';
+
+  if (!cityName) {
+    return {
+      status: 400,
+      jsonBody: {
+        saved: false,
+        message: 'cityName is required.',
+      },
+    };
+  }
+
+  if (cityName.length > MAX_CITY_NAME_LENGTH) {
+    return {
+      status: 400,
+      jsonBody: {
+        saved: false,
+        message: `cityName must be ${MAX_CITY_NAME_LENGTH} characters or fewer.`,
+      },
+    };
+  }
+
+  try {
+    const pool = await getConnectionPool();
+    const result = await pool
+      .request()
+      .input('cityName', sql.NVarChar(MAX_CITY_NAME_LENGTH), cityName)
+      .query(`
+        INSERT INTO dbo.search_history (city_name)
+        OUTPUT INSERTED.id, INSERTED.city_name, INSERTED.searched_at
+        VALUES (@cityName);
+      `);
+
+    return {
+      status: 201,
+      jsonBody: {
+        saved: true,
+        search: result.recordset[0],
+      },
+    };
+  } catch (error) {
+    poolPromise = undefined;
+    context.error('Failed to save search history.', error);
+
+    return {
+      status: 500,
+      jsonBody: {
+        saved: false,
+        message: 'Search history is temporarily unavailable.',
+      },
+    };
+  }
+};
+
 app.http('searches', {
-  methods: ['POST'],
+  methods: ['GET', 'POST'],
   authLevel: 'anonymous',
   route: 'searches',
   handler: async (request, context) => {
-    const body = await parseRequestBody(request);
-    const cityName = typeof body.cityName === 'string' ? body.cityName.trim() : '';
-
-    if (!cityName) {
-      return {
-        status: 400,
-        jsonBody: {
-          saved: false,
-          message: 'cityName is required.',
-        },
-      };
+    if (request.method === 'GET') {
+      return getRecentSearches(context);
     }
 
-    if (cityName.length > MAX_CITY_NAME_LENGTH) {
-      return {
-        status: 400,
-        jsonBody: {
-          saved: false,
-          message: `cityName must be ${MAX_CITY_NAME_LENGTH} characters or fewer.`,
-        },
-      };
-    }
-
-    try {
-      const pool = await getConnectionPool();
-      const result = await pool
-        .request()
-        .input('cityName', sql.NVarChar(MAX_CITY_NAME_LENGTH), cityName)
-        .query(`
-          INSERT INTO dbo.search_history (city_name)
-          OUTPUT INSERTED.id, INSERTED.city_name, INSERTED.searched_at
-          VALUES (@cityName);
-        `);
-
-      return {
-        status: 201,
-        jsonBody: {
-          saved: true,
-          search: result.recordset[0],
-        },
-      };
-    } catch (error) {
-      poolPromise = undefined;
-      context.error('Failed to save search history.', error);
-
-      return {
-        status: 500,
-        jsonBody: {
-          saved: false,
-          message: 'Search history is temporarily unavailable.',
-        },
-      };
-    }
+    return saveSearch(request, context);
   },
 });

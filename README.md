@@ -24,6 +24,7 @@ Azure SQL Database
 - Current date
 - Seven-day forecast summary
 - Search history API at `/api/searches`
+- Recent Searches panel powered by saved Azure SQL rows
 - Azure SQL table for saved city searches
 - GitHub Actions deployment to Azure Static Web Apps
 
