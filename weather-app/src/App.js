@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import WeatherCard from './components/WeatherCard';
 import Calendar from './components/Calendar';
 import MeteorologicalPredictions from './components/MeteorologicalPredictions';
+import { saveSearch } from './services/SearchHistoryService';
 import { getWeatherData } from './services/WeatherService';
 
 const App = () => {
@@ -30,6 +31,7 @@ const App = () => {
       const data = await getWeatherData(city);
       setWeatherData(data);
       setMeteorologicalPredictions(data.forecastSummary);
+      void saveSearch(data.name);
     } catch (error) {
       console.error('Error fetching weather data:', error);
       setWeatherData(null);

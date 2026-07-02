@@ -1,97 +1,205 @@
-# Azure Static Web Apps Deployment
+# Azure Three-Layer Deployment
 
-This React app is ready for Azure Static Web Apps. It uses Open-Meteo for weather data, so there are no weather API keys, application secrets, or paid weather services. Azure Static Web Apps still needs a deployment credential for GitHub Actions; that token only authorizes GitHub to publish the static site to your Azure resource.
+This project uses the simplest Azure architecture that satisfies the app, API, and database requirements.
 
-## How The App Works
+```text
+User
+  |
+  v
+Azure Static Web App
+  |
+  v
+Managed Azure Function at /api/searches
+  |
+  v
+Azure SQL Database
+```
 
-- `weather-app/src/App.js` renders the city search form, current date, weather card, weekly forecast text, loading state, and errors.
-- `weather-app/src/services/WeatherService.js` calls Open-Meteo's geocoding API to convert a city name into latitude and longitude, then calls Open-Meteo's forecast API for current temperature, current weather code, and a seven-day forecast.
-- `weather-app/src/components/WeatherCard.js` keeps the original UI contract: it reads `name`, `main.temp`, and `weather[0].description`.
-- `weather-app/src/components/Calendar.js` shows today's date.
-- `weather-app/src/components/MeteorologicalPredictions.js` shows the forecast summary.
+## Architecture
+
+- Presentation layer: `weather-app`, a React app hosted by Azure Static Web Apps.
+- Application layer: `api`, a managed Azure Functions API deployed with the same Static Web App.
+- Database layer: Azure SQL Database with one table, `dbo.search_history`.
+
+The browser still gets weather from Open-Meteo. After a successful weather lookup, the frontend sends a separate fire-and-forget POST request to `/api/searches`. If the API or SQL database is down, the weather result still appears because the save request is not awaited by the search flow.
+
+## How Each Layer Communicates
+
+- User -> Azure Static Web App: The user opens the public Azure Static Web Apps URL.
+- Static Web App -> Open-Meteo: The React app calls Open-Meteo directly for weather data.
+- Static Web App -> Azure Function: The React app posts `{ "cityName": "..." }` to `/api/searches`.
+- Azure Function -> Azure SQL Database: The function reads `SQL_CONNECTION_STRING` from Static Web Apps environment variables and inserts the city name into `dbo.search_history`.
+
+## Files That Matter
+
+- `.github/workflows/azure-static-web-apps-witty-sea-032759a00.yml`: builds and deploys the frontend plus API.
+- `weather-app/src/services/WeatherService.js`: Open-Meteo weather lookup.
+- `weather-app/src/services/SearchHistoryService.js`: sends successful searches to `/api/searches`.
+- `api/src/functions/searches.js`: Azure Function that writes to SQL.
+- `database/schema.sql`: table schema to run in Azure SQL.
+- `weather-app/public/staticwebapp.config.json`: Static Web Apps config and Node 20 API runtime.
+
+## SQL Schema
+
+Run this in Azure SQL Query editor:
+
+```sql
+CREATE TABLE dbo.search_history (
+    id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_search_history PRIMARY KEY,
+    city_name NVARCHAR(255) NOT NULL,
+    searched_at DATETIME2(0) NOT NULL CONSTRAINT DF_search_history_searched_at DEFAULT SYSUTCDATETIME()
+);
+
+CREATE INDEX IX_search_history_searched_at
+ON dbo.search_history (searched_at DESC);
+```
+
+## Azure SQL Database Portal Steps
+
+1. Open https://portal.azure.com/.
+2. Search for `SQL databases`.
+3. Select `Create`.
+4. Basics tab:
+   - Subscription: use the same subscription as the Static Web App.
+   - Resource group: use `rg-react-weather-app` or the resource group that contains your Static Web App.
+   - Database name: `weatherappdb`.
+   - Server: select `Create new`.
+5. New server:
+   - Server name: use a globally unique name, for example `weatherapp-sql-turtlesrqul`.
+   - Location: choose a nearby region.
+   - Authentication method: `Use SQL authentication`.
+   - Server admin login: for example `sqladminuser`.
+   - Password: create a strong password and save it somewhere safe.
+   - Select `OK`.
+6. Workload environment: choose `Development`.
+7. Compute + storage:
+   - If Azure offers a free Azure SQL Database option, select it.
+   - Otherwise choose the lowest-cost development/serverless option shown in the portal.
+   - Use locally redundant backup storage for the lowest-cost simple setup.
+8. Networking tab:
+   - Connectivity method: `Public endpoint`.
+   - Add current client IP address: `Yes` so you can use Query editor.
+   - Allow Azure services and resources to access this server: `Yes` so the managed Azure Function can connect.
+   - Minimum TLS version: keep the default or `1.2`.
+9. Security tab:
+   - Leave Microsoft Defender for SQL off unless you intentionally want that paid/security feature.
+10. Additional settings:
+   - Use existing data: `None`.
+11. Select `Review + create`.
+12. Select `Create`.
+13. After the database is created, open the SQL database resource.
+14. Select `Query editor (preview)`.
+15. Sign in using SQL authentication with the admin login and password from step 5.
+16. Paste the SQL schema above and select `Run`.
+
+## Connection String
+
+In the SQL database resource:
+
+1. Open `Connection strings`.
+2. Choose `ADO.NET`.
+3. Copy the connection string.
+4. Replace `{your_password}` with your SQL admin password.
+5. Use this as the value for `SQL_CONNECTION_STRING`.
+
+Example shape:
+
+```text
+Server=tcp:<server-name>.database.windows.net,1433;Initial Catalog=weatherappdb;Persist Security Info=False;User ID=<sql-admin-user>;Password=<sql-admin-password>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+```
+
+## Static Web Apps Environment Variables
+
+In your Static Web App resource:
+
+1. Open your `weatherApp` Static Web App in Azure Portal.
+2. In the left menu, go to `Settings` -> `Environment variables`.
+3. Select the `Production` environment.
+4. Select `+ Add`.
+5. Add:
+   - Name: `SQL_CONNECTION_STRING`
+   - Value: the Azure SQL connection string above.
+6. Select `Apply`.
+7. Select `Apply` again to save.
+
+Only one runtime environment variable is required:
+
+```text
+SQL_CONNECTION_STRING
+```
+
+GitHub Actions also needs the Azure deployment secret that Azure already created for this app:
+
+```text
+AZURE_STATIC_WEB_APPS_API_TOKEN_WITTY_SEA_032759A00
+```
+
+Do not put the SQL connection string in GitHub secrets for this setup. It belongs in Azure Static Web Apps environment variables because the backend API reads it at runtime.
+
+## GitHub Actions Deployment
+
+The workflow deploys both layers:
+
+```yaml
+app_location: "./weather-app"
+api_location: "api"
+output_location: "build"
+```
+
+Every push to `main` triggers a new deployment. The frontend and API are deployed together. The API is available under the same domain at:
+
+```text
+/api/searches
+```
 
 ## Local Commands
 
-Run these from `weather-app`:
+Frontend:
 
 ```bash
+cd weather-app
 npm install
 npm test -- --watchAll=false
 npm run build
-npm start
 ```
 
-## GitHub Setup
-
-You cannot push to `arasgungore/react-weather-app` unless you own it or have write access. Use one of these simple options:
-
-1. Fork the repository on GitHub, then push this updated code to your fork.
-2. Or create a new empty GitHub repository and push this folder to it.
-
-Example commands from the repository root:
+API:
 
 ```bash
-git remote set-url origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git add .
-git commit -m "Deploy React weather app to Azure Static Web Apps"
-git push -u origin main
+cd api
+npm install
+npm test
 ```
 
-## Azure Portal Steps
+Optional local API settings:
 
-1. Go to https://azure.microsoft.com/free/ and create a free Azure account.
-2. Open https://portal.azure.com/ and sign in.
-3. Search for `Static Web Apps`.
-4. Select `Static Web Apps`, then select `Create`.
-5. On the Basics tab:
-   - Subscription: choose your subscription.
-   - Resource group: select `Create new`, for example `rg-react-weather-app`.
-   - Name: for example `react-weather-open-meteo`.
-   - Plan type: `Free`.
-   - Region: choose the nearest region offered for Azure Functions and staging details.
-6. Deployment details:
-   - Source: choose `Other` if available. This is the most predictable path because this repository already includes `.github/workflows/azure-static-web-apps.yml`.
-   - If Azure asks for a deployment authorization policy, choose `Deployment token`.
-   - If `Other` is not available, choose `GitHub`, authorize Azure, select your repository and branch, then use the Build Details in step 7.
-7. Build Details, only if you chose Source `GitHub`:
-   - Build Presets: `React`.
-   - App location: `weather-app`.
-   - API location: leave empty.
-   - Output location: `build`.
-   - If Azure creates a second workflow file, keep only one Azure Static Web Apps workflow to avoid duplicate deployments.
-8. Select `Review + create`.
-9. Select `Create`.
-10. After deployment, select `Go to resource`.
-11. If you used Source `Other`, open `Manage deployment token`, copy the token, and add it to GitHub:
-    - GitHub repository > Settings > Secrets and variables > Actions > New repository secret.
-    - Name: `AZURE_STATIC_WEB_APPS_API_TOKEN`.
-    - Secret: paste the Azure deployment token.
-12. If you used Source `GitHub` and Azure created a secret with a generated name, either rename that GitHub secret to `AZURE_STATIC_WEB_APPS_API_TOKEN` or update `.github/workflows/azure-static-web-apps.yml` to use the generated secret name.
-13. Go to GitHub > Actions and run `Azure Static Web Apps CI/CD`, or push a commit to `main`.
-14. When the action succeeds, return to the Azure Static Web Apps Overview page and open the generated public URL.
+1. Copy `api/local.settings.json.sample` to `api/local.settings.json`.
+2. Fill in `SQL_CONNECTION_STRING`.
+3. Do not commit `api/local.settings.json`.
 
-## Automatic Redeployment
+## Test The Database Save
 
-The workflow in `.github/workflows/azure-static-web-apps.yml` runs automatically on:
+After deployment and after setting `SQL_CONNECTION_STRING`:
 
-- Every push to `main`.
-- Pull requests opened, updated, reopened, or closed against `main`.
-- Manual runs from the GitHub Actions `workflow_dispatch` button.
+1. Open the live site.
+2. Search for `Singapore`.
+3. Open Azure SQL Query editor.
+4. Run:
 
-To redeploy, commit and push:
-
-```bash
-git add .
-git commit -m "Update weather app"
-git push
+```sql
+SELECT TOP 20 id, city_name, searched_at
+FROM dbo.search_history
+ORDER BY searched_at DESC;
 ```
+
+You should see the searched city with a UTC timestamp.
 
 ## Troubleshooting
 
-- `The app build failed`: open the failed GitHub Actions run and check the build log. Run `npm install` and `npm run build` locally from `weather-app`.
-- `No matching app_location found`: confirm the workflow uses `app_location: weather-app`.
-- `Output location not found`: confirm the workflow uses `output_location: build`, not `weather-app/build`.
-- `Missing AZURE_STATIC_WEB_APPS_API_TOKEN`: add the deployment token as a GitHub Actions repository secret with exactly that name.
-- `404 after refresh`: confirm `weather-app/public/staticwebapp.config.json` exists and was included in the build output.
-- `City not found`: try a more specific city name such as `Paris, France` or `Springfield Illinois`.
-- `Open-Meteo request blocked in browser`: check the browser console and retry. The app makes direct HTTPS requests to Open-Meteo and does not use a backend.
+- Weather works but rows are not saved: check `SQL_CONNECTION_STRING` in Static Web Apps environment variables.
+- API returns 500: confirm the table exists by running `SELECT TOP 1 * FROM dbo.search_history;`.
+- SQL login fails: reset the SQL server admin password or check the connection string user/password.
+- Timeout from API to SQL: in the SQL server networking settings, enable `Allow Azure services and resources to access this server`.
+- GitHub Actions does not deploy API: confirm the workflow has `api_location: "api"`.
+- Duplicate workflows run: keep only `.github/workflows/azure-static-web-apps-witty-sea-032759a00.yml`.
+- Local API install warns about Node version: Azure uses Node 20 through `staticwebapp.config.json`; local Node 22 can still load the code for syntax checks.

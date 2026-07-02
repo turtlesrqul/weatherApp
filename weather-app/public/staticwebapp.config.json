@@ -8,5 +8,8 @@
       "/robots.txt",
       "/*.png"
     ]
+  },
+  "platform": {
+    "apiRuntime": "node:20"
   }
 }

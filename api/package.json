@@ -1,0 +1,17 @@
+{
+  "name": "weather-app-api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start",
+    "test": "node -e \"require('./src/functions/searches'); console.log('api loaded')\""
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.16.1",
+    "mssql": "^12.6.0"
+  }
+}
