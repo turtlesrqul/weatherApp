@@ -9,34 +9,51 @@ const App = () => {
   const [city, setCity] = useState('');
   const [weatherData, setWeatherData] = useState(null);
   const [date, setDate] = useState('');
-  const [meteorologicalPredictions, setMeteorologicalPredictions] = useState('');
+  const [meteorologicalPredictions, setMeteorologicalPredictions] = useState(
+    'Search for a city to see the weekly forecast.'
+  );
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const currentDate = new Date().toDateString();
-    const predictions = 'Meteorological predictions for the week: ...';
 
     setDate(currentDate);
-    setMeteorologicalPredictions(predictions);
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearch = async (event) => {
+    event.preventDefault();
+    setErrorMessage('');
+    setIsLoading(true);
+
     try {
       const data = await getWeatherData(city);
       setWeatherData(data);
+      setMeteorologicalPredictions(data.forecastSummary);
     } catch (error) {
       console.error('Error fetching weather data:', error);
+      setWeatherData(null);
+      setMeteorologicalPredictions('Search for a city to see the weekly forecast.');
+      setErrorMessage(error.message || 'Unable to fetch weather data.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div>
-      <input
-        type="text"
-        placeholder="Enter city"
-        value={city}
-        onChange={(e) => setCity(e.target.value)}
-      />
-      <button onClick={handleSearch}>Search</button>
+      <form onSubmit={handleSearch}>
+        <input
+          type="text"
+          placeholder="Enter city"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+        />
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? 'Searching...' : 'Search'}
+        </button>
+      </form>
+      {errorMessage && <p role="alert">{errorMessage}</p>}
       {weatherData && <WeatherCard data={weatherData} />}
       {date && <Calendar date={date} />}
       {meteorologicalPredictions && (

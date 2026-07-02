@@ -1,131 +1,62 @@
-# react-weather-app
+# React Weather App
 
-A simple weather app built with React.js and OpenWeatherMap API. It allows users to check the current weather for a specific city, view the current date, and access meteorological predictions.
+A simple React weather app that lets users search for a city, view the current date, see current weather, and read a weekly forecast summary.
 
-
-
-## Table of Contents
-
-- [Features](#features)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Technologies Used](#technologies-used)
-- [API Key](#api-key)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-- [Author](#author)
-
-
+This version uses [Open-Meteo](https://open-meteo.com/) instead of OpenWeatherMap, so the app does not need a weather API key.
 
 ## Features
 
-- **Weather Information:** Displays the current temperature and weather conditions for a given city.
-- **Calendar:** Shows the current date.
-- **Meteorological Predictions:** Provides meteorological predictions for the week (simulated).
-
-
-
-## Getting Started
-
-1. Navigate to the project directory:
-
-```bash
-cd weather-app
-```
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-
+- City weather search
+- Current temperature and weather description
+- Current date
+- Seven-day meteorological forecast summary
+- Azure Static Web Apps deployment workflow
 
 ## Project Structure
 
-The project follows the following structure:
-
-```
-weather-app/
-|-- public/
-|   |-- index.html
-|-- src/
-|   |-- components/
-|   |   |-- WeatherCard.js
-|   |   |-- Calendar.js
-|   |   |-- MeteorologicalPredictions.js
-|   |-- services/
-|   |   |-- WeatherService.js
-|   |-- App.js
-|   |-- index.js
-|-- .env
-|-- .gitignore
-|-- README.md
+```text
+.
+|-- .github/workflows/azure-static-web-apps.yml
+|-- AZURE_DEPLOYMENT.md
+|-- weather-app/
+|   |-- public/
+|   |   |-- staticwebapp.config.json
+|   |-- src/
+|   |   |-- components/
+|   |   |-- services/WeatherService.js
+|   |   |-- App.js
+|   |-- package.json
 ```
 
-- `public/`: Contains the HTML file for the app.
-- `src/`: Contains the source code.
-  - `components/`: React components for WeatherCard, Calendar, and MeteorologicalPredictions.
-  - `services/`: Weather service for fetching data from the OpenWeatherMap API.
-  - `App.js`: Main component that ties everything together.
-- `.env`: Environment file for storing the OpenWeatherMap API key (not included in the repository).
-- `.gitignore`: Specifies files and directories to be ignored by Git.
-- `package.json`: Contains project metadata and dependencies.
-
-
-
-## Technologies Used
-
-- [React](https://reactjs.org/): JavaScript library for building user interfaces.
-- [Axios](https://axios-http.com/): Promise-based HTTP client for making API requests.
-- [Styled-components](https://styled-components.com/): CSS-in-JS library for styling React components.
-
-
-
-## API Key
-
-This project requires an API key from [OpenWeatherMap](https://openweathermap.org/) to fetch weather data. Follow these steps to obtain a key:
-
-1. Sign up for a free account on the OpenWeatherMap website.
-2. Once logged in, navigate to the API keys section and generate a new key.
-3. Create a `.env` file in the root of the project and add your API key:
-
-```
-REACT_APP_API_KEY=your_api_key_here
-```
-
-
-
-## Usage
-
-1. Run the app:
+## Local Development
 
 ```bash
+cd weather-app
+npm install
 npm start
 ```
 
-2. Open your browser and navigate to <http://localhost:3000>.
+The app runs at http://localhost:3000.
 
-3. Enter a city in the input field and click the "Search" button to see the weather information, current date, and meteorological predictions.
+## Build And Test
 
+```bash
+cd weather-app
+npm test -- --watchAll=false
+npm run build
+```
 
+## Azure Deployment
 
-## Contributing
+Use Azure Static Web Apps on the Free plan. Full beginner-friendly deployment instructions are in [AZURE_DEPLOYMENT.md](AZURE_DEPLOYMENT.md).
 
-Feel free to contribute to this project. Fork the repository, make changes, and submit a pull request.
+Recommended settings:
 
-
+- App location: `weather-app`
+- API location: leave empty
+- Output location: `build`
+- Build command: `npm run build`
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-
-
-
-## Author
-
-👤 **Aras Güngöre**
-
-- LinkedIn: [@arasgungore](https://www.linkedin.com/in/arasgungore)
-- GitHub: [@arasgungore](https://github.com/arasgungore)
+This project is licensed under the MIT License.

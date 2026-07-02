@@ -8,12 +8,16 @@ const Card = styled.div`
 `;
 
 const WeatherCard = ({ data }) => {
-  const { name, main: { temp }, weather } = data;
+  const {
+    name,
+    main: { temp },
+    weather,
+  } = data;
 
   return (
     <Card>
       <h2>{name}</h2>
-      <p>Temperature: {temp} °C</p>
+      <p>Temperature: {temp} {'\u00b0C'}</p>
       <p>Weather: {weather[0].description}</p>
     </Card>
   );
